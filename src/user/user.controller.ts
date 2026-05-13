@@ -18,7 +18,7 @@ export class UserController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('ADMIN')
+  @Roles('SPECIAL_ED')
   @Get()
   findAll() {
     return this.userService.findAll()
@@ -34,7 +34,7 @@ export class UserController {
     @Param('id') id: string,
     @GetUser() user: any,
   ) {
-    if (user.userId !== id && user.role !== 'ADMIN') {
+    if (user.userId !== id && user.role !== 'SPECIAL_ED') {
       throw new ForbiddenException('Acesso negado')
     }
 
@@ -47,7 +47,7 @@ export class UserController {
     @Body() body: UpdateUserDto,
     @GetUser() user: any,
   ) {
-    if (user.userId !== id && user.role !== 'ADMIN') {
+    if (user.userId !== id && user.role !== 'SPECIAL_ED') {
       throw new ForbiddenException('Acesso negado')
     }
 
@@ -59,7 +59,7 @@ export class UserController {
     @Param('id') id: string,
     @GetUser() user: any,
   ) {
-    if (user.userId !== id && user.role !== 'ADMIN') {
+    if (user.userId !== id && user.role !== 'SPECIAL_ED') {
       throw new ForbiddenException('Acesso negado')
     }
 
