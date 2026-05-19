@@ -8,24 +8,57 @@ datasource db {
 }
 
 enum RoleType {
+  ADMIN
   TEACHER
   COORDINATOR
   SPECIAL_ED
 }
 
+enum ResourceType {
+  PDF
+  VIDEO
+  DOCUMENT
+  TEMPLATE
+}
+
+enum DiagnosisResult {
+  GENERAL_PEDAGOGY
+  INCLUSIVE_EDUCATION
+  AUTISM_SUPPORT
+  TDAH_SUPPORT
+  DYSLEXIA_SUPPORT
+}
+
+enum LearningLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum LearningCategory {
+  FUNDAMENTOS
+  INCLUSAO
+  AUTISMO
+  TDAH
+  DISLEXIA
+  GERAL
+}
+
 model User {
-  id       String   @id @default(uuid())
+  id       String @id @default(uuid())
   name     String
-  email    String   @unique
+  email    String @unique
   password String
-  role     RoleType @default(TEACHER)
+
+  role RoleType @default(TEACHER)
 
   lessonPlans LessonPlan[]
   diagnoses   Diagnosis[]
   diaries     Diary[]
   progress    UserProgress[]
 
-  learningPaths LearningPath[]
+  learningPaths    LearningPath[]
+  createdResources Resource[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -37,9 +70,9 @@ model LessonPlan {
   description String
   content     String
 
-  objectives  String[]   // objetivo pedagógico
-  strategies  String[]   // estratégias de ensino
-  inclusions  String[]   // adaptações inclusivas (TEA, TDAH, dislexia etc)
+  objectives String[]
+  strategies String[]
+  inclusions String[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -47,19 +80,73 @@ model LessonPlan {
   diary Diary?
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Category {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  resources Resource[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Resource {
   id          String @id @default(uuid())
   title       String
   description String
-  type        String
-  url         String
+
+  type ResourceType
+  url  String
+
+  thumbnail String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  tags ResourceTag[]
 
   stepId String?
   step   Step?   @relation(fields: [stepId], references: [id])
 
+  recommendations Recommendation[]
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([stepId])
+  @@index([createdById])
+}
+
+model Tag {
+  id   String @id @default(uuid())
+  name String @unique
+
+  resources ResourceTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ResourceTag {
+  resourceId String
+  tagId      String
+
+  resource Resource @relation(fields: [resourceId], references: [id])
+  tag      Tag      @relation(fields: [tagId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@id([resourceId, tagId])
 }
 
 model LearningPath {
@@ -67,14 +154,45 @@ model LearningPath {
   title       String
   description String
 
+  category LearningCategory @default(GERAL)
+  duration String?
+
+  level LearningLevel @default(BEGINNER)
+
   steps Step[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   createdById String?
   createdBy   User?   @relation(fields: [createdById], references: [id])
 
   recommendations Recommendation[]
+
+  @@index([createdById])
+}
+
+model Step {
+  id String @id @default(uuid())
+
+  title       String
+  description String?
+  videoUrl    String?
+  content     String?
+
+  position Int
+
+  learningPathId String
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id])
+
+  resources Resource[]
+
+  progress UserProgress[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([learningPathId, position])
 }
 
 model UserProgress {
@@ -88,66 +206,68 @@ model UserProgress {
   user User @relation(fields: [userId], references: [id])
   step Step @relation(fields: [stepId], references: [id])
 
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, stepId])
   @@index([userId])
-}
-
-model Step {
-  id       String @id @default(uuid())
-  title    String
-  position Int
-
-  learningPathId String
-  learningPath   LearningPath @relation(fields: [learningPathId], references: [id])
-
-  resources Resource[]
-  progress  UserProgress[]
-
-  createdAt DateTime @default(now())
-
-  @@unique([learningPathId, position])
-  @@index([learningPathId])
+  @@index([stepId])
 }
 
 model Diagnosis {
-  id     String @id @default(uuid())
+  id String @id @default(uuid())
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
   answers Json
-  result  String
+
+  result DiagnosisResult
 
   recommendations Recommendation[]
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([result])
 }
 
 model Recommendation {
-  id          String    @id @default(uuid())
+  id String @id @default(uuid())
+
   diagnosisId String
   diagnosis   Diagnosis @relation(fields: [diagnosisId], references: [id])
 
   learningPathId String?
   learningPath   LearningPath? @relation(fields: [learningPathId], references: [id])
 
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id])
+
+  reason String?
+
   createdAt DateTime @default(now())
+
+  @@index([diagnosisId])
 }
 
 model Diary {
-  id      String @id @default(uuid())
+  id String @id @default(uuid())
 
-  lessonPlanId String @unique
+  lessonPlanId String     @unique
   lessonPlan   LessonPlan @relation(fields: [lessonPlanId], references: [id])
 
-  whatWorked   String
-  whatFailed   String?
-  studentResponse String?
+  whatWorked          String
+  whatFailed          String?
+  studentResponse     String?
   inclusionReflection String?
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

@@ -7,6 +7,7 @@ import {
   UseGuards,
   Req
 } from '@nestjs/common'
+
 import { LearningPathService } from './learning-paths.service'
 import { CreateLearningPathDto } from './dto/create-learning-path.dto'
 import { UpdateProgressDto } from './dto/progress.dto'
@@ -23,8 +24,8 @@ export class LearningPathController {
   }
 
   @Get()
-  findAll() {
-    return this.service.findAll()
+  findAll(@Req() req) {
+    return this.service.findAll(req.user?.userId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -34,8 +35,8 @@ export class LearningPathController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id)
+  findOne(@Param('id') id: string, @Req() req) {
+    return this.service.findOne(id, req.user?.userId)
   }
 
   @UseGuards(JwtAuthGuard)
