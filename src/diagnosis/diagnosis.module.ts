@@ -10,9 +10,6 @@ import { RecommendationsModule } from '../recommendations/recommendations.module
 @Module({
   imports: [RecommendationsModule],
   controllers: [DiagnosisController],
-  providers: [
-    DiagnosisService,
-    PrismaService,
-  ],
+  providers: [DiagnosisService, PrismaService],
 })
 export class DiagnosisModule {}

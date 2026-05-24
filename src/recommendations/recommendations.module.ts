@@ -7,10 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   controllers: [RecommendationsController],
-  providers: [
-    RecommendationService,
-    PrismaService,
-  ],
+  providers: [RecommendationService, PrismaService],
   exports: [RecommendationService],
 })
 export class RecommendationsModule {}

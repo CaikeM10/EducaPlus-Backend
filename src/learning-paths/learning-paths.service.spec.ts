@@ -1,15 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LearningPathsService } from './learning-paths.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { LearningPathService } from './learning-paths.service';
 
-describe('LearningPathsService', () => {
-  let service: LearningPathsService;
+describe('LearningPathService', () => {
+  let service: LearningPathService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [LearningPathsService],
+      providers: [
+        LearningPathService,
+        { provide: PrismaService, useValue: {} },
+      ],
     }).compile();
 
-    service = module.get<LearningPathsService>(LearningPathsService);
+    service = module.get<LearningPathService>(LearningPathService);
   });
 
   it('should be defined', () => {

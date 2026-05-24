@@ -1,10 +1,10 @@
-import { IsString, IsBoolean, IsNotEmpty } from 'class-validator'
+import { IsString, IsBoolean, IsNotEmpty } from 'class-validator';
 
 export class UpdateProgressDto {
   @IsString()
   @IsNotEmpty()
-  stepId!: string
+  stepId!: string;
 
   @IsBoolean()
-  completed!: boolean
+  completed!: boolean;
 }

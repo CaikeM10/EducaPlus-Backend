@@ -4,11 +4,11 @@ import {
   ValidateNested,
   IsNumber,
   IsNotEmpty,
-  IsEnum
-} from 'class-validator'
+  IsEnum,
+} from 'class-validator';
 
-import { Type } from 'class-transformer'
-import { ResourceType, LearningLevel, LearningCategory } from '@prisma/client'
+import { Type } from 'class-transformer';
+import { ResourceType, LearningLevel, LearningCategory } from '@prisma/client';
 
 /* =========================
    RESOURCE DTO
@@ -16,22 +16,22 @@ import { ResourceType, LearningLevel, LearningCategory } from '@prisma/client'
 class CreateContentDto {
   @IsString()
   @IsNotEmpty()
-  title!: string
+  title!: string;
 
   @IsString()
   @IsNotEmpty()
-  description!: string
+  description!: string;
 
   @IsEnum(ResourceType)
-  type!: ResourceType
+  type!: ResourceType;
 
   @IsString()
   @IsNotEmpty()
-  url!: string
+  url!: string;
 
   @IsString()
   @IsNotEmpty()
-  categoryId!: string
+  categoryId!: string;
 }
 
 /* =========================
@@ -40,18 +40,18 @@ class CreateContentDto {
 class CreateStepDto {
   @IsString()
   @IsNotEmpty()
-  title!: string
+  title!: string;
 
   @IsString()
-  description?: string
+  description?: string;
 
   @IsNumber()
-  position!: number
+  position!: number;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateContentDto)
-  resources!: CreateContentDto[]
+  resources!: CreateContentDto[];
 }
 
 /* =========================
@@ -60,23 +60,23 @@ class CreateStepDto {
 export class CreateLearningPathDto {
   @IsString()
   @IsNotEmpty()
-  title!: string
+  title!: string;
 
   @IsString()
   @IsNotEmpty()
-  description!: string
+  description!: string;
 
   @IsEnum(LearningLevel)
-  level!: LearningLevel
+  level!: LearningLevel;
 
   @IsEnum(LearningCategory)
-  category!: LearningCategory
+  category!: LearningCategory;
 
   @IsString()
-  duration?: string
+  duration?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateStepDto)
-  steps!: CreateStepDto[]
+  steps!: CreateStepDto[];
 }

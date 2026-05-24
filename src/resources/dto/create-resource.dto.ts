@@ -2,31 +2,39 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
-  IsString
-} from 'class-validator'
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
 
-import { ResourceType } from '@prisma/client'
+import { ResourceType } from '@prisma/client';
 
 export class CreateResourceDto {
   @IsString()
   @IsNotEmpty()
-  title!: string
+  title!: string;
 
   @IsString()
   @IsNotEmpty()
-  description!: string
+  description!: string;
 
   @IsEnum(ResourceType)
-  type!: ResourceType
+  type!: ResourceType;
 
   @IsString()
   @IsNotEmpty()
-  url!: string
+  @IsUrl({}, { message: 'Informe uma URL válida para o recurso' })
+  url!: string;
 
   @IsString()
   @IsNotEmpty()
-  categoryId!: string
+  categoryId!: string;
 
   @IsArray()
-  tags!: string[]
+  @IsString({ each: true })
+  tags!: string[];
+
+  @IsOptional()
+  @IsString()
+  thumbnail?: string;
 }

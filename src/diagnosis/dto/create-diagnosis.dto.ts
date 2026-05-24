@@ -1,7 +1,4 @@
-import {
-  IsObject,
-  IsNotEmpty,
-} from 'class-validator';
+import { IsObject, IsNotEmpty } from 'class-validator';
 
 export class CreateDiagnosisDto {
   @IsObject()

@@ -1,6 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { RoleType } from '@prisma/client';
 
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import {
+  createPaginatedResponse,
+  getPagination,
+} from '../common/utils/pagination.util';
 
 import { RecommendationService } from '../recommendations/recommendations.service';
 
@@ -14,32 +25,23 @@ export class DiagnosisService {
     private recommendationService: RecommendationService,
   ) {}
 
-  async create(
-    userId: string,
-    dto: CreateDiagnosisDto,
-  ) {
+  async create(userId: string, dto: CreateDiagnosisDto) {
     const result = this.analyzeAnswers(dto.answers);
 
-    const diagnosis =
-      await this.prisma.diagnosis.create({
-        data: {
-          userId,
-          answers: dto.answers,
-          result,
-        },
-      });
+    const diagnosis = await this.prisma.diagnosis.create({
+      data: {
+        userId,
+        answers: dto.answers,
+        result,
+      },
+    });
 
-    await this.recommendationService.generate(
-      diagnosis.id,
-      result,
-    );
+    await this.recommendationService.generate(diagnosis.id, result);
 
     return diagnosis;
   }
 
-  private analyzeAnswers(
-    answers: Record<string, string>,
-  ) {
+  private analyzeAnswers(answers: Record<string, string>) {
     let autism = 0;
     let tdah = 0;
     let inclusive = 0;
@@ -79,31 +81,57 @@ export class DiagnosisService {
     return 'GENERAL_PEDAGOGY';
   }
 
-  findAll() {
-    return this.prisma.diagnosis.findMany({
-      include: {
-        recommendations: true,
-      },
-    });
-  }
+  async findAll(query: PaginationQueryDto) {
+    const { page, limit, skip, take } = getPagination(query);
+    const where = this.buildWhere(query);
 
-  findByUser(userId: string) {
-    return this.prisma.diagnosis.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        recommendations: {
-          include: {
-            learningPath: true,
-            resource: true,
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.diagnosis.findMany({
+        where,
+        include: {
+          recommendations: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: { createdAt: query.order },
+        skip,
+        take,
+      }),
+      this.prisma.diagnosis.count({ where }),
+    ]);
+
+    return createPaginatedResponse(items, total, page, limit);
+  }
+
+  async findByUser(userId: string, query: PaginationQueryDto) {
+    const { page, limit, skip, take } = getPagination(query);
+    const where = this.buildWhere({ ...query, userId });
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.diagnosis.findMany({
+        where,
+        include: {
+          recommendations: {
+            include: {
+              learningPath: true,
+              resource: true,
+            },
+          },
+        },
+        orderBy: { createdAt: query.order },
+        skip,
+        take,
+      }),
+      this.prisma.diagnosis.count({ where }),
+    ]);
+
+    return createPaginatedResponse(items, total, page, limit);
   }
 
   findOne(id: string) {
@@ -115,19 +143,64 @@ export class DiagnosisService {
     });
   }
 
-  update(
-    id: string,
-    dto: UpdateDiagnosisDto,
-  ) {
+  async findOneForUser(id: string, user: AuthenticatedUser) {
+    const diagnosis = await this.findOne(id);
+    this.assertCanAccess(diagnosis, user);
+    return diagnosis;
+  }
+
+  async update(id: string, dto: UpdateDiagnosisDto, user: AuthenticatedUser) {
+    const diagnosis = await this.findOne(id);
+    this.assertCanAccess(diagnosis, user);
+
     return this.prisma.diagnosis.update({
       where: { id },
       data: dto,
     });
   }
 
-  remove(id: string) {
+  async remove(id: string, user: AuthenticatedUser) {
+    const diagnosis = await this.findOne(id);
+    this.assertCanAccess(diagnosis, user);
+
     return this.prisma.diagnosis.delete({
       where: { id },
     });
+  }
+
+  private assertCanAccess(
+    diagnosis: { userId: string } | null,
+    user: AuthenticatedUser,
+  ) {
+    if (!diagnosis) {
+      throw new NotFoundException('Diagnóstico não encontrado');
+    }
+
+    if (diagnosis.userId !== user.id && user.role !== RoleType.ADMIN) {
+      throw new ForbiddenException('Acesso negado ao diagnóstico');
+    }
+  }
+
+  private buildWhere(query: PaginationQueryDto) {
+    return {
+      AND: [
+        query.userId ? { userId: query.userId } : {},
+        query.search
+          ? {
+              result: {
+                equals: query.search as never,
+              },
+            }
+          : {},
+        query.from || query.to
+          ? {
+              createdAt: {
+                ...(query.from && { gte: new Date(query.from) }),
+                ...(query.to && { lte: new Date(query.to) }),
+              },
+            }
+          : {},
+      ],
+    };
   }
 }

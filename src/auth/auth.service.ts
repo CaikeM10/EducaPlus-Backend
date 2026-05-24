@@ -1,8 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
-import { PrismaService } from 'src/prisma/prisma.service'
-import { JwtService } from '@nestjs/jwt'
-import * as bcrypt from 'bcrypt'
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { RoleType } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../prisma/prisma.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { JwtPayload } from './types/jwt-payload.type';
 
 @Injectable()
 export class AuthService {
@@ -11,7 +18,8 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async login(email: string, password: string) {
+  async login(dto: LoginDto) {
+    const email = dto.email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -20,13 +28,13 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = await bcrypt.compare(dto.password, user.password);
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
@@ -45,43 +53,43 @@ export class AuthService {
     };
   }
 
-  async register(name: string, email: string, password: string, role: string) {
-    // 1. Verifica se já existe
+  async register(dto: RegisterDto) {
+    const email = dto.email.trim().toLowerCase();
+    const name = dto.name.trim();
+
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      throw new BadRequestException("Email já cadastrado");
+      throw new BadRequestException('Email já cadastrado');
     }
 
-    // 2. Hash da senha
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const validRoles = ['TEACHER', 'COORDINATOR', 'SPECIAL_ED']; // ajuste conforme seus roles
-    if (!validRoles.includes(role)) {
-      throw new BadRequestException("Role inválido");
+    if (dto.role === RoleType.ADMIN) {
+      throw new BadRequestException(
+        'Cadastro público não permite perfil ADMIN',
+      );
     }
 
-    // 3. Cria usuário
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+
     const user = await this.prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
-        role: role as any, // ajuste conforme seu enum de roles
+        role: dto.role,
       },
     });
 
-    // 4. Gera token
-    const payload = {
+    const payload: JwtPayload = {
       sub: user.id,
+      email: user.email,
       role: user.role,
     };
 
     const access_token = this.jwtService.sign(payload);
 
-    // 5. Retorna igual login
     return {
       access_token,
       user: {

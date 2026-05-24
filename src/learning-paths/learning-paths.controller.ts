@@ -1,17 +1,20 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
+  Controller,
+  Get,
   Param,
+  Post,
+  Query,
   UseGuards,
-  Req
-} from '@nestjs/common'
+} from '@nestjs/common';
 
-import { LearningPathService } from './learning-paths.service'
-import { CreateLearningPathDto } from './dto/create-learning-path.dto'
-import { UpdateProgressDto } from './dto/progress.dto'
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'
+import { LearningPathService } from './learning-paths.service';
+import { CreateLearningPathDto } from './dto/create-learning-path.dto';
+import { UpdateProgressDto } from './dto/progress.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GetUser } from '../auth/get-user.decorator';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { FilterLearningPathDto } from './dto/filter-learning-path.dto';
 
 @Controller('learning-paths')
 export class LearningPathController {
@@ -19,29 +22,43 @@ export class LearningPathController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() dto: CreateLearningPathDto, @Req() req) {
-    return this.service.create(dto, req.user.userId)
+  create(
+    @Body() dto: CreateLearningPathDto,
+    @GetUser() user: AuthenticatedUser,
+  ) {
+    return this.service.create(dto, user.id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@Req() req) {
-    return this.service.findAll(req.user?.userId)
+  findAll(
+    @GetUser() user: AuthenticatedUser,
+    @Query() query: FilterLearningPathDto,
+  ) {
+    return this.service.findAll(user.id, query);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('with-progress')
-  getWithProgress(@Req() req) {
-    return this.service.getLearningPathsWithProgress(req.user.userId)
+  getWithProgress(
+    @GetUser() user: AuthenticatedUser,
+    @Query() query: FilterLearningPathDto,
+  ) {
+    return this.service.getLearningPathsWithProgress(user.id, query);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req) {
-    return this.service.findOne(id, req.user?.userId)
+  findOne(@Param('id') id: string, @GetUser() user: AuthenticatedUser) {
+    return this.service.findOne(id, user.id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('progress')
-  updateProgress(@Body() dto: UpdateProgressDto, @Req() req) {
-    return this.service.updateProgress(req.user.userId, dto)
+  updateProgress(
+    @Body() dto: UpdateProgressDto,
+    @GetUser() user: AuthenticatedUser,
+  ) {
+    return this.service.updateProgress(user.id, dto);
   }
 }

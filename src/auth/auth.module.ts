@@ -1,19 +1,30 @@
-import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
-import { AuthService } from './auth.service'
-import { AuthController } from './auth.controller'
-import { PrismaService } from 'src/prisma/prisma.service'
-import { JwtStrategy } from './jwt.strategy'
-import { RolesGuard } from './roles.guard'
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import type { SignOptions } from 'jsonwebtoken';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
+import { RolesGuard } from './roles.guard';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: 'segredo_super_secreto', // depois vamos melhorar isso
-      signOptions: { expiresIn: '1d' },
+    ConfigModule,
+    PrismaModule,
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ??
+            '1d') as SignOptions['expiresIn'],
+        },
+      }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PrismaService, JwtStrategy, RolesGuard],
+  providers: [AuthService, JwtStrategy, RolesGuard],
+  exports: [JwtModule],
 })
 export class AuthModule {}

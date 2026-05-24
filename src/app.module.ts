@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module'
+import { PrismaModule } from './prisma/prisma.module';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { LearningPathsModule } from './learning-paths/learning-paths.module';
@@ -11,9 +12,23 @@ import { DiaryModule } from './diary/diary.module';
 import { CategoriesModule } from './categories/categories.module';
 import { DiagnosisModule } from './diagnosis/diagnosis.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
-  imports: [PrismaModule, UserModule, AuthModule, LearningPathsModule, ResourcesModule, LessonPlanModule, DiaryModule, CategoriesModule, DiagnosisModule, RecommendationsModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    UserModule,
+    AuthModule,
+    LearningPathsModule,
+    ResourcesModule,
+    LessonPlanModule,
+    DiaryModule,
+    CategoriesModule,
+    DiagnosisModule,
+    RecommendationsModule,
+    HealthModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

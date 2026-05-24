@@ -1,11 +1,16 @@
-import { IsOptional, IsString } from 'class-validator'
+import { IsOptional, IsString } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
-export class FilterResourceDto {
+export class FilterResourceDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
-  category?: string
+  category?: string;
 
   @IsOptional()
   @IsString()
-  search?: string
+  tags?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 }
