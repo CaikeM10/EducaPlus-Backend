@@ -34,6 +34,8 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    const isReturningUser = user.lastLoginAt !== null;
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -42,6 +44,8 @@ export class AuthService {
 
     const access_token = this.jwtService.sign(payload);
 
+    await this.recordLogin(user.id);
+
     return {
       access_token,
       user: {
@@ -49,6 +53,10 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt,
+        isReturningUser,
       },
     };
   }
@@ -90,6 +98,8 @@ export class AuthService {
 
     const access_token = this.jwtService.sign(payload);
 
+    await this.recordLogin(user.id);
+
     return {
       access_token,
       user: {
@@ -97,7 +107,23 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt,
+        isReturningUser: false,
       },
     };
+  }
+
+  private async recordLogin(userId: string) {
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { lastLoginAt: new Date() },
+      }),
+      this.prisma.loginEvent.create({
+        data: { userId },
+      }),
+    ]);
   }
 }

@@ -56,12 +56,15 @@ model User {
   diagnoses   Diagnosis[]
   diaries     Diary[]
   progress    UserProgress[]
+  loginEvents LoginEvent[]
+  resourceDownloads ResourceDownload[]
 
   learningPaths    LearningPath[]
   createdResources Resource[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
 }
 
 model LessonPlan {
@@ -115,6 +118,7 @@ model Resource {
   step   Step?   @relation(fields: [stepId], references: [id])
 
   recommendations Recommendation[]
+  downloads ResourceDownload[]
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
@@ -125,6 +129,22 @@ model Resource {
   @@index([categoryId])
   @@index([stepId])
   @@index([createdById])
+}
+
+model ResourceDownload {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resourceId])
+  @@index([createdAt])
 }
 
 model Tag {
@@ -212,6 +232,18 @@ model UserProgress {
   @@unique([userId, stepId])
   @@index([userId])
   @@index([stepId])
+}
+
+model LoginEvent {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Diagnosis {

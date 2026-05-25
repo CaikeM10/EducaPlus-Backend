@@ -16,6 +16,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Achievement, AchievementType } from './types/achievement.type';
 
 @Injectable()
 export class UserService {
@@ -87,6 +88,7 @@ export class UserService {
           role: true,
           createdAt: true,
           updatedAt: true,
+          lastLoginAt: true,
         },
         orderBy: { [sort]: query.order },
         skip,
@@ -108,6 +110,7 @@ export class UserService {
         role: true,
         createdAt: true,
         updatedAt: true,
+        lastLoginAt: true,
       },
     });
 
@@ -171,6 +174,97 @@ export class UserService {
     return { message: 'Senha alterada com sucesso' };
   }
 
+  async getAchievements(userId: string): Promise<Achievement[]> {
+    const [
+      allLearningPaths,
+      completedLearningPathIds,
+      lessonPlansCount,
+      diariesCount,
+      downloadsCount,
+      loginEvents,
+    ] = await Promise.all([
+      this.prisma.learningPath.findMany({
+        select: {
+          id: true,
+          steps: {
+            select: {
+              id: true,
+              progress: {
+                where: {
+                  userId,
+                  completed: true,
+                },
+                select: {
+                  id: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.getCompletedLearningPathIds(userId),
+      this.prisma.lessonPlan.count({ where: { userId } }),
+      this.prisma.diary.count({ where: { userId } }),
+      this.prisma.resourceDownload.count({ where: { userId } }),
+      this.prisma.loginEvent.findMany({
+        where: { userId },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    const completedPathsCount = completedLearningPathIds.length;
+    const totalPathsWithSteps = allLearningPaths.filter(
+      (path) => path.steps.length > 0,
+    ).length;
+    const loginStreak = this.calculateLoginStreak(loginEvents);
+
+    return [
+      this.createAchievement(
+        AchievementType.FIRST_STEPS,
+        'Primeiros Passos',
+        'Completou sua primeira trilha de aprendizado',
+        completedPathsCount,
+        1,
+      ),
+      this.createAchievement(
+        AchievementType.DEDICATED_LEARNER,
+        'Aprendiz Dedicado',
+        'Logou por 7 dias seguidos',
+        loginStreak,
+        7,
+      ),
+      this.createAchievement(
+        AchievementType.PLANNING_MASTER,
+        'Mestre do Planejamento',
+        'Criou 10 planos de aula',
+        lessonPlansCount,
+        10,
+      ),
+      this.createAchievement(
+        AchievementType.REFLECTIVE_PROFESSIONAL,
+        'Profissional Reflexivo',
+        'Adicionou 5 entradas no diário',
+        diariesCount,
+        5,
+      ),
+      this.createAchievement(
+        AchievementType.KNOWLEDGE_SEEKER,
+        'Buscador de Conhecimento',
+        'Baixou 10 recursos',
+        downloadsCount,
+        10,
+      ),
+      this.createAchievement(
+        AchievementType.MASTER_TEACHER,
+        'Professor Mestre',
+        'Completou todas as trilhas de aprendizado',
+        completedPathsCount,
+        Math.max(totalPathsWithSteps, 1),
+      ),
+    ];
+  }
+
   async remove(id: string) {
     return this.prisma.user.delete({
       where: { id },
@@ -183,6 +277,69 @@ export class UserService {
     });
   }
 
+  private async getCompletedLearningPathIds(userId: string) {
+    const paths = await this.prisma.learningPath.findMany({
+      select: {
+        id: true,
+        steps: {
+          select: {
+            id: true,
+            progress: {
+              where: {
+                userId,
+                completed: true,
+              },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    return paths
+      .filter(
+        (path) =>
+          path.steps.length > 0 &&
+          path.steps.every((step) => step.progress.length > 0),
+      )
+      .map((path) => path.id);
+  }
+
+  private createAchievement(
+    type: AchievementType,
+    title: string,
+    description: string,
+    current: number,
+    target: number,
+  ): Achievement {
+    const safeTarget = Math.max(target, 1);
+
+    return {
+      type,
+      title,
+      description,
+      current: Math.min(current, safeTarget),
+      target: safeTarget,
+      achieved: current >= safeTarget,
+    };
+  }
+
+  private calculateLoginStreak(events: Array<{ createdAt: Date }>) {
+    const loginDays = new Set(
+      events.map((event) => event.createdAt.toISOString().slice(0, 10)),
+    );
+
+    let streak = 0;
+    const cursor = new Date();
+
+    while (loginDays.has(cursor.toISOString().slice(0, 10))) {
+      streak += 1;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+
+    return streak;
+  }
+
   private toPublicUser(user: {
     id: string;
     name: string;
@@ -190,6 +347,7 @@ export class UserService {
     role: RoleType;
     createdAt: Date;
     updatedAt?: Date;
+    lastLoginAt?: Date | null;
   }) {
     return {
       id: user.id,
@@ -198,6 +356,9 @@ export class UserService {
       role: user.role,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      lastLoginAt: user.lastLoginAt,
+      isReturningUser:
+        user.lastLoginAt !== null && user.lastLoginAt !== undefined,
     };
   }
 }

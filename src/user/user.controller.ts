@@ -48,6 +48,11 @@ export class UserController {
     return this.userService.findOne(user.id);
   }
 
+  @Get('me/achievements')
+  getMyAchievements(@GetUser() user: AuthenticatedUser) {
+    return this.userService.getAchievements(user.id);
+  }
+
   @Patch('me')
   updateMe(@GetUser() user: AuthenticatedUser, @Body() body: UpdateProfileDto) {
     return this.userService.updateProfile(user.id, body);

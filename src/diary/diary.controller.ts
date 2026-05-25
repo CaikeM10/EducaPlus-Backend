@@ -5,12 +5,14 @@ import {
   Param,
   Body,
   Delete,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 
 import { DiaryService } from './diary.service';
 import { CreateDiaryDto } from './dto/create-diary.dto';
+import { UpdateDiaryDto } from './dto/update-diary.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GetUser } from '../auth/get-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
@@ -40,6 +42,15 @@ export class DiaryController {
     @GetUser() user: AuthenticatedUser,
   ) {
     return this.diaryService.findByLessonPlan(lessonPlanId, user.id);
+  }
+
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDiaryDto,
+    @GetUser() user: AuthenticatedUser,
+  ) {
+    return this.diaryService.update(id, dto, user.id);
   }
 
   @Delete(':id')

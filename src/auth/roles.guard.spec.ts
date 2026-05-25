@@ -14,7 +14,11 @@ describe('RolesGuard', () => {
       getClass: jest.fn(),
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { id: 'user-id', email: 'admin@test.com', role: RoleType.ADMIN },
+          user: {
+            id: 'user-id',
+            email: 'admin@test.com',
+            role: RoleType.ADMIN,
+          },
         }),
       }),
     } as unknown as ExecutionContext;

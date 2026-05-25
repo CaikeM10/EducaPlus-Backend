@@ -10,6 +10,7 @@ import {
   getPagination,
 } from '../common/utils/pagination.util';
 import { CreateDiaryDto } from './dto/create-diary.dto';
+import { UpdateDiaryDto } from './dto/update-diary.dto';
 
 @Injectable()
 export class DiaryService {
@@ -106,6 +107,50 @@ export class DiaryService {
     }
 
     return diary;
+  }
+
+  async update(id: string, dto: UpdateDiaryDto, userId: string) {
+    const diary = await this.prisma.diary.findUnique({
+      where: { id },
+    });
+
+    if (!diary) {
+      throw new NotFoundException('Registro de diário não encontrado');
+    }
+
+    if (diary.userId !== userId) {
+      throw new ForbiddenException('Acesso negado ao diário');
+    }
+
+    if (dto.lessonPlanId && dto.lessonPlanId !== diary.lessonPlanId) {
+      const lessonPlan = await this.prisma.lessonPlan.findUnique({
+        where: { id: dto.lessonPlanId },
+      });
+
+      if (!lessonPlan || lessonPlan.userId !== userId) {
+        throw new NotFoundException('Plano de aula inválido para este usuário');
+      }
+    }
+
+    return this.prisma.diary.update({
+      where: { id },
+      data: {
+        ...(dto.lessonPlanId !== undefined && {
+          lessonPlanId: dto.lessonPlanId,
+        }),
+        ...(dto.whatWorked !== undefined && { whatWorked: dto.whatWorked }),
+        ...(dto.whatFailed !== undefined && { whatFailed: dto.whatFailed }),
+        ...(dto.studentResponse !== undefined && {
+          studentResponse: dto.studentResponse,
+        }),
+        ...(dto.inclusionReflection !== undefined && {
+          inclusionReflection: dto.inclusionReflection,
+        }),
+      },
+      include: {
+        lessonPlan: true,
+      },
+    });
   }
 
   async remove(id: string, userId: string) {

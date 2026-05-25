@@ -124,6 +124,17 @@ export class ResourcesService {
     return resource;
   }
 
+  async recordDownload(id: string, userId: string) {
+    await this.findOne(id);
+
+    return this.prisma.resourceDownload.create({
+      data: {
+        resourceId: id,
+        userId,
+      },
+    });
+  }
+
   async update(id: string, dto: UpdateResourceDto, user: AuthenticatedUser) {
     const resource = await this.findOne(id);
     this.assertCanManage(resource.createdById, user);

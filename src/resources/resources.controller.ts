@@ -39,6 +39,12 @@ export class ResourcesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post(':id/download')
+  recordDownload(@Param('id') id: string, @GetUser() user: AuthenticatedUser) {
+    return this.resourcesService.recordDownload(id, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(
     @Param('id') id: string,

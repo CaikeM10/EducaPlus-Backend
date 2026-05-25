@@ -1,7 +1,4 @@
-import {
-  createPaginatedResponse,
-  getPagination,
-} from './pagination.util';
+import { createPaginatedResponse, getPagination } from './pagination.util';
 
 describe('pagination utils', () => {
   it('calculates skip and take from page and limit', () => {

@@ -4,12 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  LearningCategory,
-  LearningPath,
-  Resource,
-  RoleType,
-} from '@prisma/client';
+import { LearningCategory, Resource, RoleType } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';

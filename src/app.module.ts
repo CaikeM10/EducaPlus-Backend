@@ -13,6 +13,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { DiagnosisModule } from './diagnosis/diagnosis.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { HealthModule } from './health/health.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module';
     DiagnosisModule,
     RecommendationsModule,
     HealthModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
