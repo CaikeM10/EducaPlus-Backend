@@ -7,11 +7,259 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                   String                @id @default(uuid())
+  name                 String
+  email                String                @unique
+  createdAt            DateTime              @default(now())
+  password             String
+  role                 RoleType              @default(TEACHER)
+  updatedAt            DateTime              @updatedAt
+  lastLoginAt          DateTime?
+  diagnoses            Diagnosis[]
+  diaries              Diary[]
+  learningPaths        LearningPath[]
+  lessonPlans          LessonPlan[]
+  lessonProgress       LessonProgress[]
+  loginEvents          LoginEvent[]
+  createdResources     Resource[]
+  resourceConsumptions ResourceConsumption[]
+  resourceDownloads    ResourceDownload[]
+  progress             UserProgress[]
+}
+
+model LessonPlan {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  content     String
+  userId      String
+  createdAt   DateTime @default(now())
+  inclusions  String[]
+  objectives  String[]
+  strategies  String[]
+  updatedAt   DateTime @updatedAt
+  diary       Diary?
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  resources Resource[]
+}
+
+model Resource {
+  id              String                @id @default(uuid())
+  title           String
+  description     String
+  url             String
+  createdAt       DateTime              @default(now())
+  stepId          String?
+  categoryId      String
+  createdById     String
+  thumbnail       String?
+  updatedAt       DateTime              @updatedAt
+  type            ResourceType
+  recommendations Recommendation[]
+  category        Category              @relation(fields: [categoryId], references: [id])
+  createdBy       User                  @relation(fields: [createdById], references: [id])
+  step            Step?                 @relation(fields: [stepId], references: [id])
+  consumptions    ResourceConsumption[]
+  downloads       ResourceDownload[]
+  tags            ResourceTag[]
+
+  @@index([categoryId])
+  @@index([stepId])
+  @@index([createdById])
+}
+
+model ResourceDownload {
+  id         String   @id @default(uuid())
+  userId     String
+  resourceId String
+  createdAt  DateTime @default(now())
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([resourceId])
+  @@index([createdAt])
+}
+
+model ResourceConsumption {
+  id              String                    @id @default(uuid())
+  userId          String
+  resourceId      String
+  stepId          String?
+  status          MaterialConsumptionStatus @default(OPENED)
+  openedAt        DateTime                  @default(now())
+  completedAt     DateTime?
+  progressPercent Int?
+  progressSeconds Int?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  resource        Resource                  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  step            Step?                     @relation(fields: [stepId], references: [id])
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceId, stepId])
+  @@index([userId])
+  @@index([resourceId])
+  @@index([stepId])
+}
+
+model Tag {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  resources ResourceTag[]
+}
+
+model ResourceTag {
+  resourceId String
+  tagId      String
+  createdAt  DateTime @default(now())
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  tag        Tag      @relation(fields: [tagId], references: [id])
+
+  @@id([resourceId, tagId])
+}
+
+model LearningPath {
+  id              String           @id @default(uuid())
+  title           String
+  description     String
+  createdAt       DateTime         @default(now())
+  createdById     String?
+  updatedAt       DateTime         @updatedAt
+  category        LearningCategory @default(GERAL)
+  duration        String?
+  level           LearningLevel    @default(BEGINNER)
+  createdBy       User?            @relation(fields: [createdById], references: [id])
+  recommendations Recommendation[]
+  steps           Step[]
+
+  @@index([createdById])
+}
+
+model Step {
+  id                   String                @id @default(uuid())
+  title                String
+  position             Int
+  learningPathId       String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  content              String?
+  description          String?
+  videoUrl             String?
+  lessonProgress       LessonProgress[]
+  resources            Resource[]
+  resourceConsumptions ResourceConsumption[]
+  learningPath         LearningPath          @relation(fields: [learningPathId], references: [id])
+  progress             UserProgress[]
+
+  @@unique([learningPathId, position])
+}
+
+model UserProgress {
+  id        String   @id @default(uuid())
+  userId    String
+  stepId    String
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  step      Step     @relation(fields: [stepId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, stepId])
+  @@index([userId])
+  @@index([stepId])
+}
+
+model LessonProgress {
+  id                 String       @id @default(uuid())
+  userId             String
+  stepId             String
+  status             LessonStatus @default(NOT_STARTED)
+  materialsCompleted Boolean      @default(false)
+  quizPassed         Boolean      @default(false)
+  completedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  step               Step         @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stepId])
+  @@index([userId])
+  @@index([stepId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Diagnosis {
+  id              String           @id @default(uuid())
+  userId          String
+  answers         Json
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  result          DiagnosisResult
+  user            User             @relation(fields: [userId], references: [id])
+  recommendations Recommendation[]
+
+  @@index([userId])
+  @@index([result])
+}
+
+model Recommendation {
+  id             String        @id @default(uuid())
+  diagnosisId    String
+  createdAt      DateTime      @default(now())
+  learningPathId String?
+  reason         String?
+  resourceId     String?
+  diagnosis      Diagnosis     @relation(fields: [diagnosisId], references: [id])
+  learningPath   LearningPath? @relation(fields: [learningPathId], references: [id])
+  resource       Resource?     @relation(fields: [resourceId], references: [id])
+
+  @@index([diagnosisId])
+}
+
+model Diary {
+  id                  String     @id @default(uuid())
+  userId              String
+  createdAt           DateTime   @default(now())
+  inclusionReflection String?
+  lessonPlanId        String     @unique
+  studentResponse     String?
+  whatFailed          String?
+  whatWorked          String
+  updatedAt           DateTime   @updatedAt
+  lessonPlan          LessonPlan @relation(fields: [lessonPlanId], references: [id])
+  user                User       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
 enum RoleType {
-  ADMIN
   TEACHER
   COORDINATOR
   SPECIAL_ED
+  ADMIN
 }
 
 enum ResourceType {
@@ -44,262 +292,17 @@ enum LearningCategory {
   GERAL
 }
 
-model User {
-  id       String @id @default(uuid())
-  name     String
-  email    String @unique
-  password String
-
-  role RoleType @default(TEACHER)
-
-  lessonPlans LessonPlan[]
-  diagnoses   Diagnosis[]
-  diaries     Diary[]
-  progress    UserProgress[]
-  loginEvents LoginEvent[]
-  resourceDownloads ResourceDownload[]
-
-  learningPaths    LearningPath[]
-  createdResources Resource[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  lastLoginAt DateTime?
+enum LessonStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  READY_FOR_QUIZ
+  COMPLETED
+  FAILED
 }
 
-model LessonPlan {
-  id          String @id @default(uuid())
-  title       String
-  description String
-  content     String
-
-  objectives String[]
-  strategies String[]
-  inclusions String[]
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  diary Diary?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-model Category {
-  id   String @id @default(uuid())
-  name String
-  slug String @unique
-
-  resources Resource[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Resource {
-  id          String @id @default(uuid())
-  title       String
-  description String
-
-  type ResourceType
-  url  String
-
-  thumbnail String?
-
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
-
-  tags ResourceTag[]
-
-  stepId String?
-  step   Step?   @relation(fields: [stepId], references: [id])
-
-  recommendations Recommendation[]
-  downloads ResourceDownload[]
-
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([categoryId])
-  @@index([stepId])
-  @@index([createdById])
-}
-
-model ResourceDownload {
-  id String @id @default(uuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([resourceId])
-  @@index([createdAt])
-}
-
-model Tag {
-  id   String @id @default(uuid())
-  name String @unique
-
-  resources ResourceTag[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ResourceTag {
-  resourceId String
-  tagId      String
-
-  resource Resource @relation(fields: [resourceId], references: [id])
-  tag      Tag      @relation(fields: [tagId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@id([resourceId, tagId])
-}
-
-model LearningPath {
-  id          String @id @default(uuid())
-  title       String
-  description String
-
-  category LearningCategory @default(GERAL)
-  duration String?
-
-  level LearningLevel @default(BEGINNER)
-
-  steps Step[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  createdById String?
-  createdBy   User?   @relation(fields: [createdById], references: [id])
-
-  recommendations Recommendation[]
-
-  @@index([createdById])
-}
-
-model Step {
-  id String @id @default(uuid())
-
-  title       String
-  description String?
-  videoUrl    String?
-  content     String?
-
-  position Int
-
-  learningPathId String
-  learningPath   LearningPath @relation(fields: [learningPathId], references: [id])
-
-  resources Resource[]
-
-  progress UserProgress[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([learningPathId, position])
-}
-
-model UserProgress {
-  id String @id @default(uuid())
-
-  userId String
-  stepId String
-
-  completed Boolean @default(false)
-
-  user User @relation(fields: [userId], references: [id])
-  step Step @relation(fields: [stepId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, stepId])
-  @@index([userId])
-  @@index([stepId])
-}
-
-model LoginEvent {
-  id String @id @default(uuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([createdAt])
-}
-
-model Diagnosis {
-  id String @id @default(uuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  answers Json
-
-  result DiagnosisResult
-
-  recommendations Recommendation[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([result])
-}
-
-model Recommendation {
-  id String @id @default(uuid())
-
-  diagnosisId String
-  diagnosis   Diagnosis @relation(fields: [diagnosisId], references: [id])
-
-  learningPathId String?
-  learningPath   LearningPath? @relation(fields: [learningPathId], references: [id])
-
-  resourceId String?
-  resource   Resource? @relation(fields: [resourceId], references: [id])
-
-  reason String?
-
-  createdAt DateTime @default(now())
-
-  @@index([diagnosisId])
-}
-
-model Diary {
-  id String @id @default(uuid())
-
-  lessonPlanId String     @unique
-  lessonPlan   LessonPlan @relation(fields: [lessonPlanId], references: [id])
-
-  whatWorked          String
-  whatFailed          String?
-  studentResponse     String?
-  inclusionReflection String?
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
+enum MaterialConsumptionStatus {
+  NOT_STARTED
+  OPENED
+  IN_PROGRESS
+  COMPLETED
 }

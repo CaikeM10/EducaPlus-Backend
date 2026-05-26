@@ -14,6 +14,7 @@ import { DiagnosisModule } from './diagnosis/diagnosis.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { HealthModule } from './health/health.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ProgressModule } from './progress/progress.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     RecommendationsModule,
     HealthModule,
     DashboardModule,
+    ProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

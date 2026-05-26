@@ -1,16 +1,27 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service';
+
 import { CreateLearningPathDto } from './dto/create-learning-path.dto';
 import { UpdateProgressDto } from './dto/progress.dto';
 import { FilterLearningPathDto } from './dto/filter-learning-path.dto';
+
 import {
   createPaginatedResponse,
   getPagination,
 } from '../common/utils/pagination.util';
 
+import { LearningProgressService } from '../progress/learning-progress.service';
+
 @Injectable()
 export class LearningPathService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly learningProgressService: LearningProgressService,
+  ) {}
 
   // =========================
   // CREATE
@@ -58,6 +69,10 @@ export class LearningPathService {
 
       include: {
         steps: {
+          orderBy: {
+            position: 'asc',
+          },
+
           include: {
             resources: {
               include: {
@@ -80,28 +95,46 @@ export class LearningPathService {
   // =========================
   async findAll(userId: string, query: FilterLearningPathDto) {
     const { page, limit, skip, take } = getPagination(query);
-    const where = this.buildWhere(query);
-    const orderBy = this.buildOrderBy(query.sort, query.order);
 
-    const [learningPaths, total] = await this.prisma.$transaction([
-      this.prisma.learningPath.findMany({
-        where,
-        include: {
-          steps: {
-            include: {
-              resources: true,
-              progress: {
-                where: { userId },
+    const where = this.buildWhere(query);
+
+    const orderBy = this.buildOrderBy(
+      query.sort,
+      query.order,
+    );
+
+    const [learningPaths, total] =
+      await this.prisma.$transaction([
+        this.prisma.learningPath.findMany({
+          where,
+
+          include: {
+            steps: {
+              orderBy: {
+                position: 'asc',
+              },
+
+              include: {
+                resources: true,
+
+                progress: {
+                  where: {
+                    userId,
+                  },
+                },
               },
             },
           },
-        },
-        orderBy,
-        skip,
-        take,
-      }),
-      this.prisma.learningPath.count({ where }),
-    ]);
+
+          orderBy,
+          skip,
+          take,
+        }),
+
+        this.prisma.learningPath.count({
+          where,
+        }),
+      ]);
 
     const items = learningPaths.map((path) => {
       const steps = path.steps.map((step) => ({
@@ -109,14 +142,21 @@ export class LearningPathService {
         title: step.title,
         description: step.description,
         resources: step.resources,
-        completed: step.progress?.some((p) => p.completed) || false,
+
+        completed:
+          step.progress?.some((p) => p.completed) ||
+          false,
       }));
+
+      const completedSteps = steps.filter(
+        (step) => step.completed,
+      ).length;
 
       const progress =
         steps.length === 0
           ? 0
           : Math.round(
-              (steps.filter((s) => s.completed).length / steps.length) * 100,
+              (completedSteps / steps.length) * 100,
             );
 
       return {
@@ -131,44 +171,71 @@ export class LearningPathService {
       };
     });
 
-    return createPaginatedResponse(items, total, page, limit);
+    return createPaginatedResponse(
+      items,
+      total,
+      page,
+      limit,
+    );
   }
 
   // =========================
   // FIND ONE
   // =========================
   async findOne(id: string, userId?: string) {
-    const path = await this.prisma.learningPath.findUnique({
-      where: { id },
-      include: {
-        steps: {
-          include: {
-            resources: true,
-            progress: userId
-              ? {
-                  where: { userId },
-                }
-              : false,
+    const path =
+      await this.prisma.learningPath.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          steps: {
+            orderBy: {
+              position: 'asc',
+            },
+
+            include: {
+              resources: true,
+
+              progress: userId
+                ? {
+                    where: {
+                      userId,
+                    },
+                  }
+                : false,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!path) return null;
+    if (!path) {
+      throw new NotFoundException(
+        'Trilha não encontrada',
+      );
+    }
 
     const steps = path.steps.map((step) => ({
       id: step.id,
       title: step.title,
       description: step.description,
       resources: step.resources,
-      completed: step.progress?.some((p) => p.completed) || false,
+
+      completed:
+        step.progress?.some((p) => p.completed) ||
+        false,
     }));
+
+    const completedSteps = steps.filter(
+      (step) => step.completed,
+    ).length;
 
     const progress =
       steps.length === 0
         ? 0
         : Math.round(
-            (steps.filter((s) => s.completed).length / steps.length) * 100,
+            (completedSteps / steps.length) * 100,
           );
 
     return {
@@ -186,23 +253,54 @@ export class LearningPathService {
   // =========================
   // UPDATE PROGRESS
   // =========================
-  async updateProgress(userId: string, dto: UpdateProgressDto) {
-    return this.prisma.userProgress.upsert({
+  async updateProgress(
+    userId: string,
+    dto: UpdateProgressDto,
+  ) {
+    const step = await this.prisma.step.findUnique({
       where: {
-        userId_stepId: {
-          userId,
-          stepId: dto.stepId,
-        },
+        id: dto.stepId,
       },
-      update: {
-        completed: dto.completed,
-      },
-      create: {
+    });
+
+    if (!step) {
+      throw new NotFoundException(
+        'Aula não encontrada',
+      );
+    }
+
+    await this.learningProgressService.syncLegacyUserProgress(
+      {
         userId,
         stepId: dto.stepId,
         completed: dto.completed,
       },
-    });
+    );
+
+    await this.learningProgressService.ensureLessonProgress(
+      userId,
+      dto.stepId,
+    );
+
+    if (dto.completed) {
+      await this.prisma.lessonProgress.update({
+        where: {
+          userId_stepId: {
+            userId,
+            stepId: dto.stepId,
+          },
+        },
+
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+    };
   }
 
   // =========================
@@ -212,41 +310,66 @@ export class LearningPathService {
     userId: string,
     query: FilterLearningPathDto,
   ) {
-    const { page, limit, skip, take } = getPagination(query);
-    const where = this.buildWhere(query);
-    const orderBy = this.buildOrderBy(query.sort, query.order);
+    const { page, limit, skip, take } =
+      getPagination(query);
 
-    const [learningPaths, total] = await this.prisma.$transaction([
-      this.prisma.learningPath.findMany({
-        where,
-        include: {
-          steps: {
-            include: {
-              progress: {
-                where: { userId },
+    const where = this.buildWhere(query);
+
+    const orderBy = this.buildOrderBy(
+      query.sort,
+      query.order,
+    );
+
+    const [learningPaths, total] =
+      await this.prisma.$transaction([
+        this.prisma.learningPath.findMany({
+          where,
+
+          include: {
+            steps: {
+              orderBy: {
+                position: 'asc',
+              },
+
+              include: {
+                progress: {
+                  where: {
+                    userId,
+                  },
+                },
               },
             },
           },
-        },
-        orderBy,
-        skip,
-        take,
-      }),
-      this.prisma.learningPath.count({ where }),
-    ]);
+
+          orderBy,
+          skip,
+          take,
+        }),
+
+        this.prisma.learningPath.count({
+          where,
+        }),
+      ]);
 
     const items = learningPaths.map((path) => {
       const steps = path.steps.map((step) => ({
         id: step.id,
         title: step.title,
-        completed: step.progress.some((p) => p.completed),
+
+        completed: step.progress.some(
+          (p) => p.completed,
+        ),
       }));
+
+      const completedSteps = steps.filter(
+        (step) => step.completed,
+      ).length;
 
       const progress =
         steps.length === 0
           ? 0
           : Math.round(
-              (steps.filter((s) => s.completed).length / steps.length) * 100,
+              (completedSteps / steps.length) * 100,
             );
 
       return {
@@ -261,23 +384,54 @@ export class LearningPathService {
       };
     });
 
-    return createPaginatedResponse(items, total, page, limit);
+    return createPaginatedResponse(
+      items,
+      total,
+      page,
+      limit,
+    );
   }
 
-  private buildWhere(query: FilterLearningPathDto) {
+  // =========================
+  // HELPERS
+  // =========================
+  private buildWhere(
+    query: FilterLearningPathDto,
+  ) {
     return {
       AND: [
-        query.category ? { category: query.category } : {},
-        query.level ? { level: query.level } : {},
-        query.userId ? { createdById: query.userId } : {},
+        query.category
+          ? {
+              category: query.category,
+            }
+          : {},
+
+        query.level
+          ? {
+              level: query.level,
+            }
+          : {},
+
+        query.userId
+          ? {
+              createdById: query.userId,
+            }
+          : {},
+
         query.from || query.to
           ? {
               createdAt: {
-                ...(query.from && { gte: new Date(query.from) }),
-                ...(query.to && { lte: new Date(query.to) }),
+                ...(query.from && {
+                  gte: new Date(query.from),
+                }),
+
+                ...(query.to && {
+                  lte: new Date(query.to),
+                }),
               },
             }
           : {},
+
         query.search
           ? {
               OR: [
@@ -287,6 +441,7 @@ export class LearningPathService {
                     mode: 'insensitive' as const,
                   },
                 },
+
                 {
                   description: {
                     contains: query.search,
@@ -300,10 +455,24 @@ export class LearningPathService {
     };
   }
 
-  private buildOrderBy(sort: string, order: 'asc' | 'desc') {
-    const allowed = ['createdAt', 'updatedAt', 'title', 'level', 'category'];
-    const field = allowed.includes(sort) ? sort : 'createdAt';
+  private buildOrderBy(
+    sort: string,
+    order: 'asc' | 'desc',
+  ) {
+    const allowed = [
+      'createdAt',
+      'updatedAt',
+      'title',
+      'level',
+      'category',
+    ];
 
-    return { [field]: order };
+    const field = allowed.includes(sort)
+      ? sort
+      : 'createdAt';
+
+    return {
+      [field]: order,
+    };
   }
 }
