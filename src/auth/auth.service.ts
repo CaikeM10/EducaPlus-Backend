@@ -20,6 +20,7 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -112,6 +113,33 @@ export class AuthService {
         lastLoginAt: user.lastLoginAt,
         isReturningUser: false,
       },
+    };
+  }
+
+  // TEMPORÁRIO: usar apenas para recuperar a conta.
+  async resetPassword(email: string, newPassword: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Usuário não encontrado');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Senha redefinida com sucesso.',
     };
   }
 
