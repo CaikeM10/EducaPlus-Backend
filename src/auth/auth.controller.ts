@@ -22,9 +22,6 @@ export class AuthController {
 
   @Post('reset-my-password')
   resetMyPassword() {
-    return this.authService.resetPassword(
-      'caikemarinho150@gmail.com',
-      'EducaPlus@2026',
-    );
+    return this.authService.resetPassword('caike@email.com', '12345678');
   }
 }
