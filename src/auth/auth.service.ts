@@ -18,28 +18,36 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
-
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
 
-    console.log('LOGIN EMAIL:', email);
-    console.log('LOGIN PASSWORD:', dto.password);
+    console.log('================ LOGIN DEBUG =================');
+    console.log('EMAIL:', email);
+    console.log('PASSWORD RAW:', JSON.stringify(dto.password));
 
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    console.log('USER FOUND:', !!user);
+    console.log('USER EXISTS:', !!user);
 
     if (!user) {
+      console.log('USUARIO NÃO ENCONTRADO');
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    console.log('HASH DB:', user.password);
+    console.log('USER EMAIL:', user.email);
+    console.log('HASH BANCO:', user.password);
 
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
 
     console.log('PASSWORD MATCH:', passwordMatch);
+
+    const generatedHash = await bcrypt.hash(dto.password, 12);
+
+    console.log('HASH GERADO AGORA:', generatedHash);
+
+    console.log('================================================');
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Credenciais inválidas');
@@ -68,59 +76,6 @@ export class AuthService {
         updatedAt: user.updatedAt,
         lastLoginAt: user.lastLoginAt,
         isReturningUser,
-      },
-    };
-  }
-  async register(dto: RegisterDto) {
-    const email = dto.email.trim().toLowerCase();
-    const name = dto.name.trim();
-
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new BadRequestException('Email já cadastrado');
-    }
-
-    if (dto.role === RoleType.ADMIN) {
-      throw new BadRequestException(
-        'Cadastro público não permite perfil ADMIN',
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(dto.password, 12);
-
-    const user = await this.prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: dto.role,
-      },
-    });
-
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const access_token = this.jwtService.sign(payload);
-
-    await this.recordLogin(user.id);
-
-    return {
-      access_token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        lastLoginAt: user.lastLoginAt,
-        isReturningUser: false,
       },
     };
   }
