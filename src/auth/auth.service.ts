@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+
 import { JwtService } from '@nestjs/jwt';
 import { RoleType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -18,6 +19,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
 
@@ -47,6 +49,12 @@ export class AuthService {
 
     console.log('HASH GERADO AGORA:', generatedHash);
 
+    const manualCompare = await bcrypt.compare(
+      'EducaPlus2026',
+      '$2b$12$dZlkxD9drq8qIW1HTLBW4e3qMg1oe3WyEZXDP4zfOLK0t0Ajv2LHS',
+    );
+
+    console.log('MANUAL COMPARE:', manualCompare);
     console.log('================================================');
 
     if (!passwordMatch) {
@@ -80,7 +88,60 @@ export class AuthService {
     };
   }
 
-  // TEMPORÁRIO: usar apenas para recuperar a conta.
+  async register(dto: RegisterDto) {
+    const email = dto.email.trim().toLowerCase();
+    const name = dto.name.trim();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('Email já cadastrado');
+    }
+
+    if (dto.role === RoleType.ADMIN) {
+      throw new BadRequestException(
+        'Cadastro público não permite perfil ADMIN',
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+
+    const user = await this.prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: dto.role,
+      },
+    });
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const access_token = this.jwtService.sign(payload);
+
+    await this.recordLogin(user.id);
+
+    return {
+      access_token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt,
+        isReturningUser: false,
+      },
+    };
+  }
+
   async resetPassword(email: string, newPassword: string) {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -111,9 +172,10 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { lastLoginAt: new Date() },
+        data: {
+          lastLoginAt: new Date(),
+        },
       }),
-
       this.prisma.loginEvent.create({
         data: { userId },
       }),
