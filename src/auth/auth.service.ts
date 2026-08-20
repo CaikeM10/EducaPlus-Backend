@@ -22,26 +22,24 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
 
-    console.log('================ LOGIN DEBUG ================');
-    console.log('EMAIL RECEBIDO:', email);
+    console.log('LOGIN EMAIL:', email);
+    console.log('LOGIN PASSWORD:', dto.password);
 
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    console.log('USUARIO ENCONTRADO:', user?.email);
-    console.log('HASH BANCO:', user?.password);
+    console.log('USER FOUND:', !!user);
 
     if (!user) {
-      console.log('USUARIO NÃO ENCONTRADO');
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    console.log('HASH DB:', user.password);
+
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
 
-    console.log('SENHA DIGITADA:', dto.password);
     console.log('PASSWORD MATCH:', passwordMatch);
-    console.log('============================================');
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Credenciais inválidas');
@@ -73,7 +71,6 @@ export class AuthService {
       },
     };
   }
-
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
