@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { RoleType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -21,15 +22,26 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = dto.email.trim().toLowerCase();
 
+    console.log('================ LOGIN DEBUG ================');
+    console.log('EMAIL RECEBIDO:', email);
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
+    console.log('USUARIO ENCONTRADO:', user?.email);
+    console.log('HASH BANCO:', user?.password);
+
     if (!user) {
+      console.log('USUARIO NÃO ENCONTRADO');
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
+
+    console.log('SENHA DIGITADA:', dto.password);
+    console.log('PASSWORD MATCH:', passwordMatch);
+    console.log('============================================');
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Credenciais inválidas');
@@ -149,6 +161,7 @@ export class AuthService {
         where: { id: userId },
         data: { lastLoginAt: new Date() },
       }),
+
       this.prisma.loginEvent.create({
         data: { userId },
       }),
